@@ -101,6 +101,14 @@ export class RootStore {
       process.env.NEXT_PUBLIC_OSMOSIS_CHAIN_ID_OVERWRITE ??
         (IS_TESTNET ? "osmo-test-5" : "osmosis")
     );
+    
+    // Debug: log the osmosis chain config
+    const osmosisChain = this.chainStore.getChain(this.chainStore.osmosis.chainId);
+    console.log("=== OSMOSIS CHAIN IN STORE ===");
+    console.log("Chain ID:", osmosisChain.chainId);
+    console.log("Bech32 Prefix:", osmosisChain.bech32Config.bech32PrefixAccAddr);
+    console.log("Stake Currency:", osmosisChain.stakeCurrency?.coinMinimalDenom);
+    console.log("===============================");
 
     const webApiBaseUrl =
       typeof window !== "undefined"

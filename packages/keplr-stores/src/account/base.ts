@@ -144,6 +144,9 @@ export class AccountSetBase {
     keplr: Keplr,
     chainInfo: ReturnType<ChainGetter["getChain"]>
   ): Promise<void> {
+    console.log("=== SUGGESTING CHAIN TO KEPLR ===");
+    console.log(JSON.stringify(chainInfo.raw, null, 2));
+    console.log("=================================");
     await keplr.experimentalSuggestChain(chainInfo.raw);
   }
 

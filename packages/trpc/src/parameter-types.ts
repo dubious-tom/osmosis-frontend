@@ -5,11 +5,13 @@ import { z } from "zod";
 
 export type UserOsmoAddress = z.infer<typeof OsmoAddressSchema>;
 export const OsmoAddressSchema = z.object({
-  osmoAddress: z.string().startsWith("osmo").optional(),
+  // Support any bech32 address prefix (osmo, oasis, etc.)
+  osmoAddress: z.string().optional(),
 });
 
 export const UserOsmoAddressSchema = z.object({
-  userOsmoAddress: z.string().startsWith("osmo").optional(),
+  // Support any bech32 address prefix (osmo, oasis, etc.)
+  userOsmoAddress: z.string().optional(),
 });
 
 export type UserCosmosAddress = z.infer<typeof UserCosmosAddressSchema>;

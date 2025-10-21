@@ -28,6 +28,10 @@ export class ObservableQueryICNSNamesInner extends ObservableCosmwasmContractCha
   }
 
   protected canFetch(): boolean {
+    // Disable ICNS for local chains (e.g., localosmosis-oasis)
+    if (this.chainId.startsWith("localosmosis") || this.chainId.includes("local")) {
+      return false;
+    }
     return Boolean(this.address) && this.contractAddress.length !== 0;
   }
 

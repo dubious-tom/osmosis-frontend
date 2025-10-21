@@ -193,7 +193,104 @@ async function generateAssetListFile({
 }) {
   const osmosisChainId = getOsmosisChainId(environment);
 
-  const assetLists = assetList.assets.reduce<AssetList[]>((acc, asset) => {
+  // Check if we're using a custom local oasis chain
+  const isLocalOasisChain = environment === "testnet" && OSMOSIS_CHAIN_ID_OVERWRITE === "localosmosis-oasis";
+
+  let assetLists: AssetList[];
+
+  // If local oasis chain, create a custom asset list with STAKE token
+  if (isLocalOasisChain) {
+    const osmosisTestnetChain = chains.find(
+      (chain) => chain.chain_name === "osmosistestnet"
+    );
+    if (osmosisTestnetChain) {
+      assetLists = [
+        {
+          chain_name: osmosisTestnetChain.chain_name,
+          chain_id: OSMOSIS_CHAIN_ID_OVERWRITE || osmosisChainId,
+          assets: [
+            {
+              chainName: osmosisTestnetChain.chain_name,
+              sourceDenom: "stake",
+              coinMinimalDenom: "stake",
+              symbol: "STAKE",
+              decimals: 6,
+              logoURIs: {
+                png: "https://raw.githubusercontent.com/cosmos/chain-registry/master/cosmoshub/images/atom.png",
+                svg: "https://raw.githubusercontent.com/cosmos/chain-registry/master/cosmoshub/images/atom.svg",
+              },
+              coingeckoId: "",
+              categories: [],
+              transferMethods: [],
+              counterparty: [],
+              variantGroupKey: "stake",
+              name: "Oasis Local Stake",
+              isAlloyed: false,
+              verified: true,
+              unstable: false,
+              disabled: false,
+              preview: false,
+              listingDate: new Date().toISOString(),
+              relative_image_url: "/tokens/generated/atom.svg",
+            },
+            // Keep original OSMO token for UI compatibility
+            {
+              chainName: osmosisTestnetChain.chain_name,
+              sourceDenom: "uosmo",
+              coinMinimalDenom: "uosmo",
+              symbol: "OSMO",
+              decimals: 6,
+              logoURIs: {
+                png: "https://raw.githubusercontent.com/cosmos/chain-registry/master/osmosis/images/osmo.png",
+                svg: "https://raw.githubusercontent.com/cosmos/chain-registry/master/osmosis/images/osmo.svg",
+              },
+              coingeckoId: "osmosis",
+              categories: [],
+              transferMethods: [],
+              counterparty: [],
+              variantGroupKey: "uosmo",
+              name: "Osmosis (compatibility)",
+              isAlloyed: false,
+              verified: true,
+              unstable: false,
+              disabled: false,
+              preview: false,
+              listingDate: new Date().toISOString(),
+              relative_image_url: "/tokens/generated/osmo.svg",
+            },
+            // Keep ION token for UI compatibility
+            {
+              chainName: osmosisTestnetChain.chain_name,
+              sourceDenom: "uion",
+              coinMinimalDenom: "uion",
+              symbol: "ION",
+              decimals: 6,
+              logoURIs: {
+                png: "https://raw.githubusercontent.com/cosmos/chain-registry/master/osmosis/images/ion.png",
+                svg: "https://raw.githubusercontent.com/cosmos/chain-registry/master/osmosis/images/ion.svg",
+              },
+              coingeckoId: "ion",
+              categories: [],
+              transferMethods: [],
+              counterparty: [],
+              variantGroupKey: "uion",
+              name: "ION (compatibility)",
+              isAlloyed: false,
+              verified: true,
+              unstable: false,
+              disabled: false,
+              preview: false,
+              listingDate: new Date().toISOString(),
+              relative_image_url: "/tokens/generated/ion.svg",
+            },
+          ],
+        },
+      ];
+    } else {
+      assetLists = [];
+    }
+  } else {
+    assetLists = assetList.assets.reduce<AssetList[]>((acc, asset) => {
     /** If it's from the first chain, assume it's an Osmosis asset */
     if (asset.chainName === chains[0].chain_name) {
       const chain = chains.find((chain) => chain.chain_id === osmosisChainId);
@@ -231,6 +328,7 @@ async function generateAssetListFile({
 
     return createOrAddToAssetList(acc, chain, asset, environment);
   }, [] as AssetList[]);
+  }
 
   let content: string = "";
 
@@ -245,15 +343,18 @@ async function generateAssetListFile({
     `;
   }
 
+  // Flatten all assets from assetLists for type generation
+  const allAssets = assetLists.flatMap((list) => list.assets);
+
   // create available symbols type
   content += `    
     export type ${
       environment === "testnet" ? "TestnetAssetSymbols" : "MainnetAssetSymbols"
-    } = ${Array.from(new Set(assetList.assets.map((asset) => asset.symbol)))
+    } = ${Array.from(new Set(allAssets.map((asset) => asset.symbol)))
     .map(
       (symbol) =>
         `"${symbol}" /** source denom: ${
-          assetList.assets.find((asset) => asset.symbol === symbol)!.sourceDenom
+          allAssets.find((asset) => asset.symbol === symbol)!.sourceDenom
         } */`
     )
     .join(" | ")};
@@ -265,7 +366,7 @@ async function generateAssetListFile({
         ? "TestnetVariantGroupKeys"
         : "MainnetVariantGroupKeys"
     } = ${Array.from(
-    new Set(assetList.assets.map((asset) => asset.variantGroupKey))
+    new Set(allAssets.map((asset) => asset.variantGroupKey))
   )
     .filter((groupKey, index, self) => {
       if (isNil(groupKey)) {
@@ -277,7 +378,7 @@ async function generateAssetListFile({
     })
     .map(
       (groupKey) =>
-        `"${groupKey}" /** Symbols: ${assetList.assets
+        `"${groupKey}" /** Symbols: ${allAssets
           .filter((asset) => asset.variantGroupKey === groupKey)!
           .map((asset) => asset.symbol)
           .join(",")} */`

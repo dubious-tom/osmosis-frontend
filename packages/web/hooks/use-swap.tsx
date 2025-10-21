@@ -29,7 +29,7 @@ import {
 } from "@osmosis-labs/utils";
 import { createTRPCReact } from "@trpc/react-query";
 import { parseAsString, useQueryState } from "nuqs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { useAsync } from "react-use";
 
@@ -42,6 +42,7 @@ import { ATOM_BASE_DENOM } from "~/components/place-limit-tool/defaults";
 import { Button } from "~/components/ui/button";
 import { RecommendedSwapDenoms } from "~/config";
 import { AssetLists } from "~/config/generated/asset-lists";
+import { OSMOSIS_CHAIN_ID_OVERWRITE } from "~/config/env";
 import { DefaultSlippage } from "~/config/swap";
 import {
   getTokenInFeeAmountFiatValue,
@@ -107,8 +108,8 @@ const spotPriceQuoteMultiplier = new Dec(10);
  *  * Debounced quote fetching from user input */
 export function useSwap(
   {
-    initialFromDenom = "ATOM",
-    initialToDenom = "OSMO",
+    initialFromDenom = "stake",
+    initialToDenom = "uosmo",
     useQueryParams = true,
     useOtherCurrencies = true,
     forceSwapInPoolId,
@@ -1273,10 +1274,11 @@ function useToFromDenoms({
   /**
    * user query params as state source-of-truth
    * ignores initial denoms if there are query params
+   * Default to stake/OSMO for local Oasis chain compatibility
    */
   const [fromDenomQueryParam, setFromDenomQueryParam] = useQueryState(
     "from",
-    parseAsString.withDefault(initialFromDenom ?? ATOM_BASE_DENOM)
+    parseAsString.withDefault(initialFromDenom ?? "stake")
   );
   const fromDenomQueryParamStr =
     typeof fromDenomQueryParam === "string" ? fromDenomQueryParam : undefined;

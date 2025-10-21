@@ -148,7 +148,14 @@ function getKeplrCompatibleChain({
   assetLists: AssetList[];
   environment: "testnet" | "mainnet";
 }): ChainInfoWithExplorer | undefined {
-  const isOsmosis = chain.chain_id === getOsmosisChainId(environment);
+  // Skip chains with no chain_id
+  if (!chain.chain_id) {
+    return undefined;
+  }
+
+  const isOsmosis = chain.chain_id === getOsmosisChainId(environment) || 
+                     chain.chain_name === "osmosis" || 
+                     chain.chain_name === "osmosistestnet";
   const chainId = isOsmosis
     ? OSMOSIS_CHAIN_ID_OVERWRITE ?? chain.chain_id
     : chain.chain_id;
@@ -182,20 +189,38 @@ function getKeplrCompatibleChain({
   const stakeCurrencyImageUrl =
     stakeAsset?.logoURIs?.svg ?? stakeAsset?.logoURIs?.png;
 
+  // Check if we're using a custom local chain - ONLY for testnet, not mainnet
+  const isLocalChain = chain.chain_name === "osmosistestnet" && OSMOSIS_CHAIN_ID_OVERWRITE === "localosmosis-oasis";
+  
+  if (chain.chain_name === "osmosistestnet" || chain.chain_name === "osmosis") {
+    console.log(`[getKeplrCompatibleChain] Chain: ${chain.chain_name}, ID: ${chain.chain_id}, isOsmosis: ${isOsmosis}, isLocalChain: ${isLocalChain}, OVERWRITE: ${OSMOSIS_CHAIN_ID_OVERWRITE}`);
+  }
+
   return {
-    rpc: isOsmosis ? OSMOSIS_RPC_OVERWRITE ?? rpc : rpc,
-    rest: isOsmosis ? OSMOSIS_REST_OVERWRITE ?? rest : rest,
-    chainId: isOsmosis
+    rpc: isLocalChain ? OSMOSIS_RPC_OVERWRITE ?? rpc : rpc,
+    rest: isLocalChain ? OSMOSIS_REST_OVERWRITE ?? rest : rest,
+    chainId: isLocalChain
       ? OSMOSIS_CHAIN_ID_OVERWRITE ?? chainId ?? ""
       : chainId ?? "",
     chainName: chain.chain_name,
-    prettyChainName: isOsmosis
+    prettyChainName: isLocalChain
       ? OSMOSIS_CHAIN_NAME_OVERWRITE ?? prettyChainName
       : prettyChainName,
     bip44: {
       coinType: chain?.slip44 ?? 118,
     },
-    currencies: (chain.currencies ?? []).reduce<
+    currencies: isLocalChain
+      ? [{
+          coinDenom: "STAKE",
+          coinMinimalDenom: "stake",
+          coinDecimals: 6,
+          gasPriceStep: {
+            low: 0.0025,
+            average: 0.025,
+            high: 0.04,
+          },
+        }]
+      : (chain.currencies ?? []).reduce<
       ChainInfoWithExplorer["currencies"]
     >((acc, asset) => {
       const coinMinimalDenom = asset.coinMinimalDenom ?? "";
@@ -264,8 +289,13 @@ function getKeplrCompatibleChain({
       });
       return acc;
     }, []),
-    stakeCurrency:
-      // Note: this is a hacky fix since it's possible for chains to have no staking token (i.e. Noble)
+    stakeCurrency: isLocalChain
+      ? {
+          coinDecimals: 6,
+          coinDenom: "STAKE",
+          coinMinimalDenom: "stake",
+        }
+      : // Note: this is a hacky fix since it's possible for chains to have no staking token (i.e. Noble)
       // Newever versions of Keplr made this nullable, but our Keplr stores are from an old version of Keplr.
       // I don't anticipate this being an issue since we don't really use staking tokens on other chain in our FE features.
       // Further, most chains have staking tokens.
@@ -293,7 +323,18 @@ function getKeplrCompatibleChain({
             coinDenom: "STAKE",
             coinMinimalDenom: "tempStakePlaceholder",
           },
-    feeCurrencies: (chain.feeCurrencies ?? []).reduce<
+    feeCurrencies: isLocalChain
+      ? [{
+          coinDenom: "STAKE",
+          coinMinimalDenom: "stake",
+          coinDecimals: 6,
+          gasPriceStep: {
+            low: 0.0025,
+            average: 0.025,
+            high: 0.04,
+          },
+        }]
+      : (chain.feeCurrencies ?? []).reduce<
       ChainInfoWithExplorer["feeCurrencies"]
     >((acc, token) => {
       const asset = assetList?.assets.find(
@@ -360,7 +401,16 @@ function getKeplrCompatibleChain({
       });
       return acc;
     }, []),
-    bech32Config: chain.bech32Config,
+    bech32Config: isLocalChain
+      ? {
+          bech32PrefixAccAddr: "oasis",
+          bech32PrefixAccPub: "oasispub",
+          bech32PrefixValAddr: "oasisvaloper",
+          bech32PrefixValPub: "oasisvaloperpub",
+          bech32PrefixConsAddr: "oasisvalcons",
+          bech32PrefixConsPub: "oasisvalconspub",
+        }
+      : chain.bech32Config,
     explorerUrlToTx: chain.explorers
       ? chain.explorers[0]?.txPage.replace("${", "{")
       : "",
@@ -386,10 +436,6 @@ export function getChainList({
             keplrChain: ChainInfoWithExplorer;
           })
         | undefined => {
-        const isOsmosis =
-          chain.chain_name === "osmosis" ||
-          chain.chain_name === "osmosistestnet";
-
         const keplrChain = getKeplrCompatibleChain({
           chain,
           assetLists,
@@ -398,15 +444,69 @@ export function getChainList({
 
         if (!keplrChain) return undefined;
 
-        return {
+        // Check if this is the local oasis chain and we need to override - ONLY for testnet, not mainnet
+        const isLocalChain = chain.chain_name === "osmosistestnet" && OSMOSIS_CHAIN_ID_OVERWRITE === "localosmosis-oasis";
+
+        // Build the result, preserving all required fields from the original chain
+        const result = {
           ...chain,
+          // Override the raw chain's bech32 config for cosmos-kit
+          bech32Prefix: isLocalChain ? "oasis" : chain.bech32Prefix,
+          bech32Config: isLocalChain 
+            ? {
+                bech32PrefixAccAddr: "oasis",
+                bech32PrefixAccPub: "oasispub",
+                bech32PrefixValAddr: "oasisvaloper",
+                bech32PrefixValPub: "oasisvaloperpub",
+                bech32PrefixConsAddr: "oasisvalcons",
+                bech32PrefixConsPub: "oasisvalconspub",
+              }
+            : chain.bech32Config,
           features: chain.features ?? [],
+          // Override currencies for local chain
+          currencies: isLocalChain
+            ? [{
+                coinDenom: "STAKE",
+                coinMinimalDenom: "stake",
+                coinDecimals: 6,
+              }]
+            : chain.currencies,
+          stakeCurrency: isLocalChain
+            ? {
+                coinDenom: "STAKE",
+                coinMinimalDenom: "stake",
+                coinDecimals: 6,
+              }
+            : chain.stakeCurrency,
+          feeCurrencies: isLocalChain
+            ? [{
+                coinDenom: "STAKE",
+                coinMinimalDenom: "stake",
+                coinDecimals: 6,
+                gasPriceStep: {
+                  low: 0.0025,
+                  average: 0.025,
+                  high: 0.04,
+                },
+              }]
+            : chain.feeCurrencies,
           /**
            * Needed for CosmosKit to function correctly, otherwise
            * chain suggestion won't work.
            */
           fees: {
-            fee_tokens: (chain.feeCurrencies ?? []).map((token) => ({
+            fee_tokens: (isLocalChain 
+              ? [{
+                  coinDenom: "STAKE",
+                  coinMinimalDenom: "stake",
+                  coinDecimals: 6,
+                  gasPriceStep: {
+                    low: 0.0025,
+                    average: 0.025,
+                    high: 0.04,
+                  },
+                }]
+              : (chain.feeCurrencies ?? [])).map((token) => ({
               ...token,
               denom: token.coinMinimalDenom,
               fixed_min_gas_price: token.gasPriceStep?.low ?? 0,
@@ -416,21 +516,27 @@ export function getChainList({
             })),
           },
           staking: {
-            staking_tokens: chain.stakeCurrency ? [chain.stakeCurrency] : [],
+            staking_tokens: isLocalChain
+              ? [{
+                  coinDenom: "STAKE",
+                  coinMinimalDenom: "stake",
+                  coinDecimals: 6,
+                }]
+              : (chain.stakeCurrency ? [chain.stakeCurrency] : []),
           },
-          chain_id: isOsmosis
+          chain_id: isLocalChain
             ? OSMOSIS_CHAIN_ID_OVERWRITE ?? chain.chain_id
             : chain.chain_id,
-          prettyName: isOsmosis
+          prettyName: isLocalChain
             ? OSMOSIS_CHAIN_NAME_OVERWRITE ?? chain.prettyName
             : chain.prettyName,
           apis: {
             rpc:
-              isOsmosis && OSMOSIS_RPC_OVERWRITE
+              isLocalChain && OSMOSIS_RPC_OVERWRITE
                 ? [{ address: OSMOSIS_RPC_OVERWRITE }]
                 : chain.apis?.rpc ?? [],
             rest:
-              isOsmosis && OSMOSIS_REST_OVERWRITE
+              isLocalChain && OSMOSIS_REST_OVERWRITE
                 ? [{ address: OSMOSIS_REST_OVERWRITE }]
                 : chain.apis?.rest ?? [],
           },
@@ -440,6 +546,8 @@ export function getChainList({
           })),
           keplrChain,
         };
+        
+        return result;
       }
     )
     .filter((chain) => typeof chain !== "undefined");
