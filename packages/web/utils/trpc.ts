@@ -66,6 +66,14 @@ export const api = createTRPCNext<AppRouter>({
       defaultOptions: {
         queries: {
           cacheTime: 1000 * 60 * 60 * 24, // 24 hours
+          // For local development, use longer intervals to reduce log spam
+          // In production, queries that need more frequent updates override this per-query
+          refetchInterval: process.env.NEXT_PUBLIC_IS_TESTNET === "true" 
+            ? 120_000  // 2 minutes for local/testnet
+            : 30_000,  // 30 seconds for production
+          staleTime: process.env.NEXT_PUBLIC_IS_TESTNET === "true"
+            ? 60_000   // 1 minute for local/testnet
+            : 15_000,  // 15 seconds for production
         },
       },
     });
