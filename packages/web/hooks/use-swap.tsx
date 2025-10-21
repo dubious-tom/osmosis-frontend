@@ -29,7 +29,7 @@ import {
 } from "@osmosis-labs/utils";
 import { createTRPCReact } from "@trpc/react-query";
 import { parseAsString, useQueryState } from "nuqs";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useAsync } from "react-use";
 
@@ -38,11 +38,9 @@ import {
   getParametersFromOverspendErrorMessage,
   isOverspendErrorMessage,
 } from "~/components/alert/prettify";
-import { ATOM_BASE_DENOM } from "~/components/place-limit-tool/defaults";
 import { Button } from "~/components/ui/button";
 import { RecommendedSwapDenoms } from "~/config";
 import { AssetLists } from "~/config/generated/asset-lists";
-import { OSMOSIS_CHAIN_ID_OVERWRITE } from "~/config/env";
 import { DefaultSlippage } from "~/config/swap";
 import {
   getTokenInFeeAmountFiatValue,
@@ -1414,9 +1412,10 @@ function useQueryRouterBestQuote(
   const queryOptions = {
     // quotes should not be considered fresh for long, otherwise
     // the gas simulation will fail due to slippage and the user would see errors
+    // For local development, use much longer interval since swaps don't work anyway
     staleTime: 5_000,
     cacheTime: 5_000,
-    refetchInterval: 5_000,
+    refetchInterval: 300_000, // 5 minutes (was 5s) - reduced for local dev
 
     // Disable retries, as useQueries
     // will block successfull quotes from being returned
@@ -1450,7 +1449,7 @@ function useQueryRouterBestQuote(
         // Longer refetch and cache times due to query inefficiencies. Can be removed once that is fixed.
         staleTime: 10_000,
         cacheTime: 10_000,
-        refetchInterval: 10_000,
+        refetchInterval: 300_000, // 5 minutes (was 10s) - reduced for local dev
       }
     );
 
