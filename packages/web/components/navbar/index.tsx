@@ -331,16 +331,11 @@ const WalletInfo: FunctionComponent<
   const wallet = accountStore.getWallet(accountStore.osmosisChainId);
   const walletConnected = Boolean(wallet?.isWalletConnected);
 
-  // Debug logging for wallet state
-  console.log("[WalletInfo] chainId:", accountStore.osmosisChainId);
-  console.log("[WalletInfo] wallet:", wallet);
-  console.log("[WalletInfo] walletConnected:", walletConnected);
-  console.log("[WalletInfo] wallet?.address:", wallet?.address);
-  console.log("[WalletInfo] wallet?.isWalletConnected:", wallet?.isWalletConnected);
-
   // For local chains (like localosmosis-oasis), disable the balance query
   // to avoid errors when querying for non-existent tokens
-  const isLocalChain = accountStore.osmosisChainId.startsWith("localosmosis") || accountStore.osmosisChainId.includes("local");
+  const isLocalChain =
+    accountStore.osmosisChainId.startsWith("localosmosis") ||
+    accountStore.osmosisChainId.includes("local");
 
   const { data: userOsmoAsset, isLoading: isLoadingUserOsmoAsset } =
     api.edge.assets.getUserAsset.useQuery(
@@ -351,7 +346,8 @@ const WalletInfo: FunctionComponent<
       {
         enabled:
           !isLocalChain &&
-          Boolean(wallet?.address) && typeof wallet?.address === "string",
+          Boolean(wallet?.address) &&
+          typeof wallet?.address === "string",
       }
     );
 
